@@ -1,390 +1,682 @@
-import { useState } from "react";
+/* eslint-disable react/prop-types */
+import { useState, useEffect, useCallback } from "react";
 import Sidebar from "../components/Sidebar";
+import {
+  getProfile,
+  updateProfile,
+  uploadProfileImage,
+  deleteProfileImage,
+} from "../api/userApi";
+import { RiUser3Line } from "@remixicon/react";
+import debounce from "lodash.debounce";
 
 const ProfilePage = () => {
-  const [user, setUser] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "johndoe@email.com",
-    phone: "+1-555-0123",
-    role: "Job Seeker",
-    country: "India",
-    cityState: "Kolkata, West Bengal",
-    profileImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face&auto=format",
-    profileCompletion: 85,
-    lastUpdated: "2 days ago",
-    memberSince: "Jan 2024",
-    emailVerified: true
-  });
-
+  const [user, setUser] = useState(null);
   const [isEditing, setIsEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [imageUploading, setImageUploading] = useState(false);
+  const [message, setMessage] = useState({ type: "", text: "" });
+  const [completion, setCompletion] = useState(0);
+  const [errors, setErrors] = useState({});
+  const [imageError, setImageError] = useState(false);
+
+  // Calculate profile completion percentage
+  const calcCompletion = useCallback((u) => {
+    const fieldWeights = {
+      firstName: 15,
+      lastName: 15,
+      email: 20,
+      phone: 10,
+      role: 10,
+      country: 10,
+      city: 10,
+      profileImage: 10,
+    };
+
+    let totalWeight = Object.values(fieldWeights).reduce((a, b) => a + b, 0);
+    let completedWeight = 0;
+
+    Object.keys(fieldWeights).forEach((field) => {
+      if (u?.[field] && u[field].toString().trim() !== "") {
+        completedWeight += fieldWeights[field];
+      }
+    });
+
+    setCompletion(Math.round((completedWeight / totalWeight) * 100));
+  }, []);
+
+  // Field validation function
+  const validateField = (field, value) => {
+    const validations = {
+      email: (val) =>
+        !val
+          ? "Email is required"
+          : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+          ? "Invalid email format"
+          : "",
+      phone: (val) =>
+        val && !/^[+]?[1-9][\d]{0,15}$/.test(val.replace(/[\s\-()]/g, ""))
+          ? "Invalid phone number"
+          : "",
+      firstName: (val) =>
+        !val
+          ? "First name is required"
+          : val.trim().length < 2
+          ? "First name must be at least 2 characters"
+          : "",
+      lastName: (val) =>
+        !val
+          ? "Last name is required"
+          : val.trim().length < 2
+          ? "Last name must be at least 2 characters"
+          : "",
+      country: (val) => (!val ? "Country is required" : ""),
+      city: (val) => (!val ? "City is required" : ""),
+      role: (val) => (!val ? "Role is required" : ""),
+    };
+    return validations[field] ? validations[field](value) : "";
+  };
+
+  // Form validation function
+  const validateForm = (formData, fields) => {
+    const newErrors = {};
+    fields.forEach((field) => {
+      const error = validateField(field, formData[field] || "");
+      if (error) newErrors[field] = error;
+    });
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Fetch user profile
+  const fetchProfile = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setMessage({ type: "error", text: "Please log in to view your profile" });
+      return;
+    }
+
+    try {
+      const res = await getProfile(token);
+      const userData = {
+        ...res.data,
+        firstName: res.data.firstName || "",
+        lastName: res.data.lastName || "",
+        phone: res.data.phone || "",
+        email: res.data.email || "",
+        role: res.data.role || "",
+        country: res.data.country || "",
+        city: res.data.city || "",
+        profileImage: res.data.profileImage || null,
+      };
+      setUser(userData);
+      calcCompletion(userData);
+      localStorage.setItem("userData", JSON.stringify(userData));
+      window.dispatchEvent(
+        new CustomEvent("profileUpdated", {
+          detail: { user: userData },
+        })
+      );
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.response?.data?.msg || "Failed to load profile",
+      });
+    }
+  }, [calcCompletion]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  // Debounced validation handler
+  const debouncedValidate = useCallback(
+    debounce((field, value) => {
+      const error = validateField(field, value);
+      setErrors((prev) => ({
+        ...prev,
+        [field]: error,
+      }));
+    }, 100),
+    []
+  );
+
+  // Immediate input change handler
+  const handleInputChange = (field, value) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+    debouncedValidate(field, value);
+  };
 
   const handleEdit = (section) => {
     setIsEditing(section);
-    setEditForm(user);
-    setMessage({ type: '', text: '' });
+    setEditForm({
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      role: user?.role || "",
+      country: user?.country || "",
+      city: user?.city || "",
+    });
+    setErrors({});
+    setMessage({ type: "", text: "" });
   };
 
   const handleCancelEdit = () => {
     setIsEditing(null);
     setEditForm({});
-    setMessage({ type: '', text: '' });
+    setErrors({});
+    debouncedValidate.cancel(); // Cancel pending validations
   };
 
   const handleSaveEdit = async (section) => {
+    const fieldMap = {
+      personal: ["firstName", "lastName", "email", "phone", "role"],
+      address: ["country", "city"],
+    };
+
+    const fieldsToValidate = fieldMap[section];
+
+    if (!validateForm(editForm, fieldsToValidate)) {
+      setMessage({
+        type: "error",
+        text: "Please correct the errors in the form before saving.",
+      });
+      return;
+    }
+
     setIsLoading(true);
-    setMessage({ type: '', text: '' });
-    
+    setMessage({ type: "", text: "" });
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUser(prev => ({
-        ...prev,
-        ...editForm,
-        lastUpdated: "Just now",
-        profileCompletion: calculateProfileCompletion({ ...prev, ...editForm })
-      }));
-      
-      setMessage({ type: 'success', text: `${section} updated successfully!` });
+      const token = localStorage.getItem("token");
+      const payload = fieldsToValidate.reduce((obj, field) => {
+        obj[field] = editForm[field] || "";
+        return obj;
+      }, {});
+
+      const res = await updateProfile(token, payload);
+      const userData = {
+        ...user,
+        ...res.data,
+        firstName: res.data.firstName || editForm.firstName || user.firstName || "",
+        lastName: res.data.lastName || editForm.lastName || user.lastName || "",
+        phone: res.data.phone || editForm.phone || user.phone || "",
+        email: res.data.email || editForm.email || user.email || "",
+        role: res.data.role || editForm.role || user.role || "",
+        country: res.data.country || editForm.country || user.country || "",
+        city: res.data.city || editForm.city || user.city || "",
+      };
+
+      setUser(userData);
+      calcCompletion(userData);
+      localStorage.setItem("userData", JSON.stringify(userData));
+      setMessage({
+        type: "success",
+        text: `${
+          section.charAt(0).toUpperCase() + section.slice(1)
+        } information updated successfully!`,
+      });
       setIsEditing(null);
       setEditForm({});
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    } catch {
-      setMessage({ type: 'error', text: 'Failed to update. Please try again.' });
+      setErrors({});
+
+      window.dispatchEvent(
+        new CustomEvent("profileUpdated", {
+          detail: { user: userData },
+        })
+      );
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text:
+          err.response?.data?.msg ||
+          `Failed to update ${section} information. Please try again.`,
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleInputChange = (field, value) => {
-    setEditForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const handleImageUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setUser(prev => ({ ...prev, profileImage: e.target.result }));
-        setMessage({ type: 'success', text: 'Profile image updated!' });
-        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!validTypes.includes(file.type)) {
+      setMessage({
+        type: "error",
+        text: "Please select a valid image file (JPEG, PNG, GIF, WebP)",
+      });
+      return;
+    }
+
+    if (file.size > maxSize) {
+      setMessage({ type: "error", text: "Image size must be less than 5MB" });
+      return;
+    }
+
+    setImageUploading(true);
+    setMessage({ type: "", text: "" });
+    window.dispatchEvent(new CustomEvent("profileImageUploadStart"));
+
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("profileImage", file);
+
+      const res = await uploadProfileImage(token, formData);
+      const updatedUser = {
+        ...user,
+        ...res.data,
+        firstName: res.data.firstName || user.firstName || "",
+        lastName: res.data.lastName || user.lastName || "",
+        phone: res.data.phone || user.phone || "",
       };
-      reader.readAsDataURL(file);
+      setUser(updatedUser);
+      setImageError(false);
+      calcCompletion(updatedUser);
+      localStorage.setItem("userData", JSON.stringify(updatedUser));
+      setMessage({
+        type: "success",
+        text: "Profile image updated successfully!",
+      });
+
+      window.dispatchEvent(
+        new CustomEvent("profileImageUploadComplete", {
+          detail: { user: updatedUser },
+        })
+      );
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.response?.data?.msg || "Image upload failed",
+      });
+      window.dispatchEvent(new CustomEvent("profileImageUploadError"));
+    } finally {
+      setImageUploading(false);
+      e.target.value = "";
     }
   };
 
-  const calculateProfileCompletion = (userData) => {
-    let completion = 0;
-    const fields = ['firstName', 'lastName', 'email', 'phone', 'country', 'cityState'];
-    
-    fields.forEach(field => {
-      if (userData[field] && userData[field].trim() !== '') completion += 100/fields.length;
-    });
-    
-    if (userData.profileImage && !userData.profileImage.includes('placeholder')) completion += 10;
-    
-    return Math.min(Math.round(completion), 100);
+  const handleDeleteImage = async () => {
+    if (!window.confirm("Are you sure you want to remove your profile image?")) {
+      return;
+    }
+
+    setImageUploading(true);
+    window.dispatchEvent(new CustomEvent("profileImageUploadStart"));
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await deleteProfileImage(token);
+      const updatedUser = {
+        ...user,
+        ...res.data.user,
+        firstName: res.data.user.firstName || user.firstName || "",
+        lastName: res.data.user.lastName || user.lastName || "",
+        phone: res.data.user.phone || user.phone || "",
+        profileImage: null,
+      };
+      setUser(updatedUser);
+      setImageError(false);
+      calcCompletion(updatedUser);
+      localStorage.setItem("userData", JSON.stringify(updatedUser));
+      setMessage({
+        type: "success",
+        text: "Profile image removed successfully!",
+      });
+
+      window.dispatchEvent(
+        new CustomEvent("profileImageUploadComplete", {
+          detail: { user: updatedUser },
+        })
+      );
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.response?.data?.msg || "Failed to remove profile image",
+      });
+      window.dispatchEvent(new CustomEvent("profileImageUploadError"));
+    } finally {
+      setImageUploading(false);
+    }
   };
 
-  const handleResendVerification = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setMessage({ type: 'success', text: 'Verification email sent!' });
-      setIsLoading(false);
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    }, 1000);
+  const handleProfileImageError = () => {
+    setImageError(true);
   };
+
+  useEffect(() => {
+    if (message.text) {
+      const timer = setTimeout(() => {
+        setMessage({ type: "", text: "" });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message.text]);
+
+  if (!user) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/20">
       <Sidebar />
       <div className="flex-1 p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto space-y-6">
           {message.text && (
-            <div className={`mb-6 p-4 rounded-xl border ${
-              message.type === 'success' 
-                ? 'bg-green-50 border-green-200 text-green-800' 
-                : 'bg-red-50 border-red-200 text-red-800'
-            }`}>
-              {message.text}
+            <div
+              className={`p-4 rounded-xl border ${
+                message.type === "success"
+                  ? "bg-green-50 border-green-200 text-green-800"
+                  : "bg-red-50 border-red-200 text-red-800"
+              } animate-fade-in`}
+            >
+              <div className="flex items-center justify-between">
+                <span>{message.text}</span>
+                <button
+                  onClick={() => setMessage({ type: "", text: "" })}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           )}
-          <div className="mb-4">
+          <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-blue-600 bg-clip-text text-transparent">
               Account Settings
             </h1>
-            <p className="text-gray-500 mt-1">Manage your profile and preferences</p>
+            <p className="text-gray-500">Manage your profile and preferences</p>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-gray-700">
+                Profile Completion: {completion}%
+              </p>
+              {completion < 100 && (
+                <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                  Complete your profile for better experience
+                </span>
+              )}
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3 relative">
+              <div
+                className={`h-3 rounded-full transition-all duration-500 ${
+                  completion === 100 ? "bg-green-500" : "bg-blue-500"
+                }`}
+                style={{ width: `${completion}%` }}
+              ></div>
+            </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 space-y-6">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <div className="flex flex-col items-center text-center">
-                  <div className="relative mb-4">
-                    <img
-                      src={user.profileImage}
-                      alt="Profile"
-                      className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-lg"
-                    />
-                    <label htmlFor="imageUpload" className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-colors">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </label>
-                    <input
-                      id="imageUpload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageUpload}
-                    />
-                    {user.emailVerified && (
-                      <div className="absolute -bottom-1 -left-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-2xl shadow-sm border p-6 text-center sticky top-6">
+                <div className="relative mb-4 inline-block">
+                  <div className="relative">
+                    {user.profileImage && !imageError ? (
+                      <img
+                        src={user.profileImage}
+                        alt="Profile"
+                        className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-md mx-auto"
+                        onError={handleProfileImageError}
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded-2xl border-4 border-white shadow-md mx-auto bg-gray-100 flex items-center justify-center">
+                        <RiUser3Line size={40} className="text-gray-400" />
+                      </div>
+                    )}
+                    {imageUploading && (
+                      <div className="absolute inset-0 bg-black bg-opacity-50 rounded-2xl flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                       </div>
                     )}
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900">{user.firstName} {user.lastName}</h3>
-                  <p className="text-gray-600 mb-4">{user.role}</p>
-                  <button
-                    onClick={() => handleEdit("profile")}
-                    className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2.5 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2"
+                  <label
+                    htmlFor="imageUpload"
+                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-colors"
+                    title="Upload new photo"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    <svg
+                      className="w-4 h-4 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
                     </svg>
-                    <span>Edit Profile</span>
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-blue-100 text-xs font-medium">Profile Completion</p>
-                      <p className="text-xl font-bold mt-1">{user.profileCompletion}%</p>
-                    </div>
-                    <div className="w-10 h-10 bg-blue-400/20 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </label>
+                  {user.profileImage && !imageError && (
+                    <button
+                      onClick={handleDeleteImage}
+                      className="absolute -bottom-1 -left-1 w-8 h-8 bg-red-500 rounded-full border-2 border-white flex items-center justify-center cursor-pointer hover:bg-red-600 transition-colors"
+                      title="Remove photo"
+                      disabled={imageUploading}
+                    >
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
                       </svg>
-                    </div>
-                  </div>
-                  <div className="w-full bg-blue-400/30 rounded-full h-2 mt-3">
-                    <div 
-                      className="bg-white h-2 rounded-full transition-all duration-500" 
-                      style={{ width: `${user.profileCompletion}%` }}
-                    ></div>
-                  </div>
+                    </button>
+                  )}
+                  <input
+                    id="imageUpload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                    disabled={imageUploading}
+                  />
                 </div>
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Last Updated</p>
-                      <p className="text-gray-900 font-semibold text-sm">{user.lastUpdated}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Member Since</p>
-                      <p className="text-gray-900 font-semibold text-sm">{user.memberSince}</p>
-                    </div>
-                  </div>
-                </div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {user.firstName || user.lastName
+                    ? `${user.firstName || ""} ${user.lastName || ""}`.trim()
+                    : "User"}
+                </h3>
+                <p className="text-gray-600 mb-4">{user.role || "Not provided"}</p>
+                <p className="text-sm text-gray-500 mb-4">
+                  Member since {new Date(user.createdAt).toLocaleDateString()}
+                </p>
+                <button
+                  onClick={() => handleEdit("personal")}
+                  disabled={isEditing}
+                  className="w-full bg-blue-500 text-white px-4 py-2.5 rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md"
+                >
+                  Edit Profile
+                </button>
               </div>
             </div>
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold text-gray-800 flex items-center space-x-2">
-                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    <span>Personal Information</span>
-                  </h2>
-                  {isEditing === 'personal' ? (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleSaveEdit('personal')}
-                        disabled={isLoading}
-                        className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
-                      >
-                        {isLoading ? (
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                        <span>Save</span>
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="cursor-pointer bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleEdit("personal")}
-                      className="cursor-pointer text-gray-400 hover:text-blue-500 transition-colors duration-200 p-2 rounded-lg hover:bg-blue-50"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['firstName', 'lastName', 'email', 'phone'].map((field) => (
-                    <div key={field} className="space-y-1">
-                      <label className="text-gray-500 text-sm font-medium capitalize">
-                        {field.replace(/([A-Z])/g, ' $1')}
-                      </label>
-                      {isEditing === 'personal' ? (
-                        <input
-                          type={field === 'email' ? 'email' : 'text'}
-                          value={editForm[field] || ''}
-                          onChange={(e) => handleInputChange(field, e.target.value)}
-                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      ) : (
-                        <p className="text-gray-900 font-semibold">
-                          {user[field]}
-                          {field === 'email' && user.emailVerified && (
-                            <span className="text-green-500 text-xs bg-green-50 px-2 py-1 rounded-full ml-2">Verified</span>
-                          )}
-                        </p>
-                      )}
-                    </div>
-                  ))}             
-                  <div className="md:col-span-2 space-y-1">
-                    <label className="text-gray-500 text-sm font-medium mr-2">Role</label>
-                    {isEditing === 'personal' ? (
-                      <select
-                        value={editForm.role || ''}
-                        onChange={(e) => handleInputChange('role', e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="Job Seeker">Job Seeker</option>
-                        <option value="Employer">Employer</option>
-                        <option value="Recruiter">Recruiter</option>
-                      </select>
-                    ) : (
-                      <span className="inline-flex items-center px-3 py-1 ml-2cursor-pointer  rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                        {user.role}
-                      </span>
-                    )}
-                  </div>
-                  {!user.emailVerified && (
-                    <div className="md:col-span-2">
-                      <button
-                        onClick={handleResendVerification}
-                        disabled={isLoading}
-                        className="cursor-pointer text-blue-500 hover:text-blue-700 text-sm flex items-center space-x-1"
-                      >
-                        <span>Resend verification email</span>
-                        {isLoading && (
-                          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold text-gray-800 flex items-center space-x-2">
-                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span>Address</span>
-                  </h2>
-                  {isEditing === 'address' ? (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleSaveEdit('address')}
-                        disabled={isLoading}
-                        className="cursor-pointer bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
-                      >
-                        {isLoading ? 'Saving...' : 'Save'}
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="cursor-pointer bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleEdit("address")}
-                      className="cursor-pointer text-gray-400 hover:text-blue-500 transition-colors duration-200 p-2 rounded-lg hover:bg-blue-50"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['country', 'cityState'].map((field) => (
-                    <div key={field} className="space-y-1">
-                      <label className="text-gray-500 text-sm font-medium capitalize">
-                        {field === 'cityState' ? 'City/State' : field}
-                      </label>
-                      {isEditing === 'address' ? (
-                        <input
-                          type="text"
-                          value={editForm[field] || ''}
-                          onChange={(e) => handleInputChange(field, e.target.value)}
-                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      ) : (
-                        <p className="text-gray-900 font-semibold">{user[field]}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>        
-                <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                  <div className="flex items-center space-x-3 text-gray-600">
-                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <p className="text-sm">Complete your address details to improve job matching accuracy</p>
-                  </div>
-                </div>
-              </div>
+              <SectionCard
+                title="Personal Information"
+                fields={["firstName", "lastName", "email", "phone"]}
+                role
+                user={user}
+                isEditing={isEditing === "personal"}
+                editForm={editForm}
+                errors={errors}
+                handleInputChange={handleInputChange}
+                onEdit={() => handleEdit("personal")}
+                onCancel={handleCancelEdit}
+                onSave={() => handleSaveEdit("personal")}
+                isLoading={isLoading}
+                validateField={validateField}
+              />
+              <SectionCard
+                title="Address Information"
+                fields={["country", "city"]}
+                user={user}
+                isEditing={isEditing === "address"}
+                editForm={editForm}
+                errors={errors}
+                handleInputChange={handleInputChange}
+                onEdit={() => handleEdit("address")}
+                onCancel={handleCancelEdit}
+                onSave={() => handleSaveEdit("address")}
+                isLoading={isLoading}
+                validateField={validateField}
+              />
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+const SectionCard = ({
+  title,
+  fields,
+  role,
+  user,
+  isEditing,
+  editForm,
+  errors,
+  handleInputChange,
+  onEdit,
+  onCancel,
+  onSave,
+  isLoading,
+  validateField,
+}) => {
+  const isFormValid = () => {
+    return fields.every(
+      (field) => !validateField(field, editForm[field] || "")
+    );
+  };
+
+  const getPlaceholderText = (field) => {
+    if (field === "city") return "Enter your city";
+    const words = field.replace(/([A-Z])/g, " $1");
+    const formattedField = words.charAt(0).toUpperCase() + words.slice(1);
+    return `Enter your ${formattedField.toLowerCase()}`;
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
+        {isEditing ? (
+          <div className="flex space-x-2">
+            <button
+              onClick={onSave}
+              disabled={isLoading || !isFormValid()}
+              className="bg-green-500 cursor-pointer text-white px-4 py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoading ? (
+                <span className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Saving...
+                </span>
+              ) : (
+                "Save Changes"
+              )}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={isLoading}
+              className="bg-gray-300 cursor-pointer text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 disabled:opacity-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onEdit}
+            className="text-blue-600 cursor-pointer hover:text-blue-800 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+          >
+            Edit
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {fields.map((field) => (
+          <div key={field} className="space-y-2">
+            <label className="text-gray-700 text-sm font-medium capitalize block">
+              {field.replace(/([A-Z])/g, " $1").trim()}
+              {["firstName", "lastName", "email", "country", "city"].includes(field) && (
+                <span className="text-red-500"> *</span>
+              )}
+            </label>
+            {isEditing ? (
+              <div>
+                <input
+                  type={field === "email" ? "email" : "text"}
+                  value={editForm[field] || ""}
+                  onChange={(e) => handleInputChange(field, e.target.value)}
+                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    errors[field] ? "border-red-300" : "border-gray-300"
+                  }`}
+                  placeholder={getPlaceholderText(field)}
+                />
+                {errors[field] && (
+                  <p className="text-red-500 text-xs mt-1">{errors[field]}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-900 font-semibold p-3 bg-gray-50 rounded-lg">
+                {user[field] || (
+                  <span className="text-gray-400 italic">Not provided</span>
+                )}
+              </p>
+            )}
+          </div>
+        ))}
+        {role && (
+          <div className="md:col-span-2 space-y-2">
+            <label className="text-gray-700 text-sm font-medium block">
+              Role <span className="text-red-500">*</span>
+            </label>
+            {isEditing ? (
+              <select
+                value={editForm.role || ""}
+                onChange={(e) => handleInputChange("role", e.target.value)}
+                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.role ? "border-red-300" : "border-gray-300"
+                }`}
+              >
+                <option value="">Select your role</option>
+                <option value="Job Seeker">Job Seeker</option>
+                <option value="Recruiter">Recruiter</option>
+              </select>
+            ) : (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                {user.role || "Not provided"}
+              </span>
+            )}
+            {errors.role && (
+              <p className="text-red-500 text-xs mt-1">{errors.role}</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

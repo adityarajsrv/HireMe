@@ -10,10 +10,13 @@ import { useNavigate } from "react-router-dom";
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
+    role: "Job Seeker", // Default role
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -48,12 +51,19 @@ const LoginPage = () => {
 
       if (isLogin) {
         localStorage.setItem("token", data.token);
-        localStorage.setItem("userName", data.user.name);
+        localStorage.setItem("userData", JSON.stringify(data.user));
         setSuccess("Login successful! Redirecting...");
         setTimeout(() => navigate("/profile"), 1200);
       } else {
         setSuccess("Registration successful! You can now log in.");
         setIsLogin(true);
+        // Reset form after successful registration
+        setFormData({
+          name: "",
+          email: "",
+          password: "",
+          role: "Job Seeker",
+        });
       }
     } catch (err) {
       setError(err.message);
@@ -61,6 +71,8 @@ const LoginPage = () => {
       setLoading(false);
     }
   };
+
+  const roleOptions = ["Job Seeker", "Recruiter"];
 
   return (
     <div className="min-h-screen p-6 sm:p-12 overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-black relative">
@@ -75,10 +87,10 @@ const LoginPage = () => {
             <div className="lg:w-3/5 h-full relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-indigo-900/20"></div>
               <div className="absolute inset-0 bg-gradient-to-tr from-blue-600/5 to-transparent"></div>
-              <img 
-                className="w-full h-full object-cover" 
-                src={loginUI} 
-                alt="Login UI" 
+              <img
+                className="w-full h-full object-cover"
+                src={loginUI}
+                alt="Login UI"
               />
               <div className="absolute inset-0 bg-black/10"></div>
             </div>
@@ -94,11 +106,15 @@ const LoginPage = () => {
                     {isLogin ? "Welcome Back" : "Create Account"}
                   </h2>
                   <p className="mt-3 text-gray-300 text-sm">
-                    {isLogin 
-                      ? "Sign in to unlock your potential" 
+                    {isLogin
+                      ? "Sign in to unlock your potential"
                       : "Start your journey with us"}
                     <span
-                      onClick={() => setIsLogin(!isLogin)}
+                      onClick={() => {
+                        setIsLogin(!isLogin);
+                        setError("");
+                        setSuccess("");
+                      }}
                       className="ml-1 text-blue-400 hover:text-blue-300 cursor-pointer font-medium transition-colors"
                     >
                       {isLogin ? "Need an account?" : "Already registered?"}
@@ -107,26 +123,88 @@ const LoginPage = () => {
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {!isLogin && (
-                    <div>
-                      <label
-                        htmlFor="name"
-                        className="block text-sm font-medium text-gray-200 mb-2"
-                      >
-                        Username
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="name"
-                          name="name"
-                          type="text"
-                          value={formData.name}
-                          onChange={handleChange}
-                          className="w-full rounded-xl border border-white/10 bg-white/5 focus:bg-white/10 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 text-white placeholder-gray-400 p-3.5 transition-all duration-200 backdrop-blur-sm"
-                          placeholder="Enter your username"
-                          required
-                        />
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label
+                            htmlFor="firstName"
+                            className="block text-sm font-medium text-gray-200 mb-2"
+                          >
+                            First Name
+                          </label>
+                          <input
+                            id="firstName"
+                            name="firstName"
+                            type="text"
+                            value={formData.firstName}
+                            onChange={handleChange}
+                            placeholder="Enter your first name"
+                            className="w-full rounded-xl border border-white/10 bg-white/5 focus:bg-white/10 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 text-white placeholder-gray-400 p-3.5 transition-all duration-200 backdrop-blur-sm"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor="lastName"
+                            className="block text-sm font-medium text-gray-200 mb-2"
+                          >
+                            Last Name
+                          </label>
+                          <input
+                            id="lastName"
+                            name="lastName"
+                            type="text"
+                            value={formData.lastName}
+                            onChange={handleChange}
+                            placeholder="Enter your last name"
+                            className="w-full rounded-xl border border-white/10 bg-white/5 focus:bg-white/10 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 text-white placeholder-gray-400 p-3.5 transition-all duration-200 backdrop-blur-sm"
+                            required
+                          />
+                        </div>
                       </div>
-                    </div>
+
+                      <div>
+                        <label
+                          htmlFor="role"
+                          className="block text-sm font-medium text-gray-200 mb-2"
+                        >
+                          I am a
+                        </label>
+                        <select
+                          id="role"
+                          name="role"
+                          value={formData.role}
+                          onChange={handleChange}
+                          className="w-full rounded-xl border border-white/10 bg-white/5 focus:bg-white/10 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 text-white p-3.5 transition-all duration-200 backdrop-blur-sm appearance-none"
+                          required
+                        >
+                          {roleOptions.map((role) => (
+                            <option
+                              key={role}
+                              value={role}
+                              className="bg-gray-900 text-white"
+                            >
+                              {role}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <svg
+                            className="h-5 w-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </>
                   )}
                   <div>
                     <label
@@ -148,6 +226,7 @@ const LoginPage = () => {
                       />
                     </div>
                   </div>
+
                   <div>
                     <label
                       htmlFor="password"
@@ -165,6 +244,7 @@ const LoginPage = () => {
                         className="w-full rounded-xl border border-white/10 bg-white/5 focus:bg-white/10 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 text-white placeholder-gray-400 p-3.5 pr-12 transition-all duration-200 backdrop-blur-sm"
                         placeholder="••••••••"
                         required
+                        minLength={6}
                       />
                       <button
                         type="button"
@@ -178,27 +258,39 @@ const LoginPage = () => {
                         )}
                       </button>
                     </div>
+                    {!isLogin && (
+                      <p className="mt-1 text-xs text-gray-400">
+                        Password must be at least 6 characters long
+                      </p>
+                    )}
                   </div>
+
                   <button
                     type="submit"
                     disabled={loading}
                     className="cursor-pointer w-full flex items-center justify-center py-3.5 px-6 bg-gradient-to-r from-blue-700 to-blue-800 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-blue-500/20"
                   >
                     <LockClosedIcon className="h-5 w-5 mr-2" />
-                    {loading ? "Processing..." : isLogin ? "Sign In" : "Sign Up"}
+                    {loading
+                      ? "Processing..."
+                      : isLogin
+                      ? "Sign In"
+                      : "Sign Up"}
                   </button>
+
                   {error && (
                     <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                       {error}
                     </div>
                   )}
-                  
+
                   {success && (
                     <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
                       {success}
                     </div>
                   )}
                 </form>
+
                 <div className="mt-8 text-center text-xs text-gray-400">
                   <p>
                     By signing up, you agree to our{" "}

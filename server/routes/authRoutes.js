@@ -2,12 +2,31 @@ const express = require('express');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const { storage } = require('../config/cloudinary');
 
 const router = express.Router();
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
 
 router.post('/register', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { firstName, lastName, email, password, role } = req.body;
+        
+        // Validation
+        if (!firstName || !lastName || !email || !password) {
+            return res.status(400).json({ msg: "Please fill in all fields" });
+        }
+
         let userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json({ msg: "User already exists" });
@@ -15,54 +34,95 @@ router.post('/register', async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const user = await User.create({ name, email, password: hashedPassword });
+        const user = await User.create({ 
+            firstName,
+            lastName, 
+            email, 
+            password: hashedPassword, 
+            role: role || "Job Seeker"
+        });
 
-        res.json({ msg: "User registered successfully", user });
+        res.status(201).json({ 
+            msg: "User registered successfully", 
+            user: { 
+                id: user._id, 
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email, 
+                role: user.role 
+            } 
+        });
     } catch (err) {
-        res.status(500).json({ msg: err.message });
+        console.error('Registration error:', err);
+        res.status(500).json({ msg: "Server error during registration" });
     }
-})
+});
 
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email })
+        
+        // Validation
+        if (!email || !password) {
+            return res.status(400).json({ msg: "Please provide email and password" });
+        }
 
+        const user = await User.findOne({ email });
         if (!user) {
-            return res.status(400).json({ msg: "Invalid Credentials" });
+            return res.status(400).json({ msg: "Invalid credentials" });
         }
 
         const match = await bcrypt.compare(password, user.password);
         if (!match) {
-            return res.status(400).json({ msg: "Invalid Credentials" });
+            return res.status(400).json({ msg: "Invalid credentials" });
         }
         
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
+        
+        res.json({ 
+            token, 
+            user: { 
+                id: user._id, 
+                name: user.name, 
+                email: user.email, 
+                role: user.role // Include role in response
+            } 
+        });
     } catch (err) {
-        res.status(500).json({ msg: err.message });
+        console.error('Login error:', err);
+        res.status(500).json({ msg: "Server error during login" });
     }
 })
 
 router.get('/profile', async (req,res)=>{
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
-    if (!token) {
-      return res.status(401).json({ msg: "No token, authorization denied" });
-    }
+    if (!token) return res.status(401).json({ msg: "No token, authorization denied" });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select("-password");
-    if (!user) {
-      return res.status(404).json({ msg: "User not found" });
-    }
-    res.json(user);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    res.json({
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      country: user.country,
+      city: user.city,
+      profileImage: user.profileImage,
+      createdAt: user.createdAt
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: err.message });
+    console.error('Profile GET error:', err);  
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ msg: "Invalid token" });
+    }
+    res.status(500).json({ msg: "Server error" });
   }
 });
-
 
 router.put('/profile', async (req,res)=>{
     try{
@@ -71,16 +131,91 @@ router.put('/profile', async (req,res)=>{
             return res.status(401).json({msg: "No token, authorization denied"});
         }
 
-        const decoded =jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Only update fields that are provided
+        const updateFields = {};
+        ['firstName','lastName','email','phone','role','country','city'].forEach(field => {
+            if (req.body[field] !== undefined) updateFields[field] = req.body[field];
+        });
+
         const user = await User.findByIdAndUpdate(
             decoded.id,
-            {$set: req.body},
-            {new: true}
+            { $set: updateFields },
+            { new: true, runValidators: true }
         ).select("-password");
+
         res.json(user);
-    }catch(err){
+    } catch(err) {
+        console.error('Profile update error:', err);
         res.status(500).json({msg: err.message});
     }
+});
+
+router.put('/profile/image', upload.single('profileImage'), async (req, res) => {
+  try {
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+    if (!token) {
+      return res.status(401).json({ msg: "No token, authorization denied" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    if (!req.file) {
+      return res.status(400).json({ msg: "No image file provided" });
+    }
+    const user = await User.findByIdAndUpdate(
+      decoded.id,
+      { profileImage: req.file.path },
+      { new: true }
+    ).select("-password");
+
+    res.json(user);
+  } catch (err) {
+    console.error('Image upload error:', err);
+    res.status(500).json({ msg: err.message });
+  }
 })
+
+router.delete('/profile/image', async (req, res) => {
+  try {
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+    if (!token) {
+      return res.status(401).json({ msg: "No token, authorization denied" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    const user = await User.findByIdAndUpdate(
+      decoded.id,
+      { profileImage: null },
+      { new: true }
+    ).select("-password");
+
+    res.json({
+      msg: "Profile image removed successfully",
+      user: user
+    });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+});
+
+router.get("/verify", async (req, res) => {
+  try {
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+    if (!token) {
+      return res.status(401).json({ msg: "No token, authorization denied" });
+    }
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ msg: "Token is not valid" });
+      }
+      res.status(200).json({ msg: "Token is valid" });
+    });
+  } catch (err) {
+    res.status(500).json({ msg: "Server error" });
+  }
+});
 
 module.exports = router;
