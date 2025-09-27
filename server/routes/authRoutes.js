@@ -22,7 +22,6 @@ router.post('/register', async (req, res) => {
   try {
     const { firstName, lastName, email, password, role } = req.body;
 
-    // Validation
     if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({ msg: "Please fill in all fields" });
     }
@@ -73,8 +72,6 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Validation
     if (!email || !password) {
       return res.status(400).json({ msg: "Please provide email and password" });
     }
