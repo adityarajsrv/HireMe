@@ -143,6 +143,15 @@ The application features a fully responsive design that works seamlessly across 
 
 ---
 
+## Screenshots 
+![Landing Page](client/src/assets/LandingPage1.png]
+![Landing Page](client/src/assets/LandingPage2.png]
+![Landing Page](client/src/assets/LandingPage3.png]
+![Landing Page](client/src/assets/LandingPage4.png]
+![SignUp Page](client/src/assets/SignUpPage.png]
+![Login Page](client/src/assets/LoginPage.png]
+![Profile Page](client/src/assets/ProfilePage.png]
+
 ## ⭐ Support the Project
 
 If you find this project helpful or interesting, please consider giving it a star on GitHub! Your support helps me continue to improve and maintain the project.
