@@ -214,14 +214,16 @@ const ProfilePage = () => {
       const userData = {
         ...user,
         ...res.data,
-        firstName: res.data.firstName || editForm.firstName || user.firstName || "",
+        firstName:
+          res.data.firstName || editForm.firstName || user.firstName || "",
         lastName: res.data.lastName || editForm.lastName || user.lastName || "",
         phone: res.data.phone || editForm.phone || user.phone || "",
         email: res.data.email || editForm.email || user.email || "",
         role: res.data.role || editForm.role || user.role || "Job Seeker",
         country: res.data.country || editForm.country || user.country || "",
         city: res.data.city || editForm.city || user.city || "",
-        createdAt: res.data.createdAt || user.createdAt || new Date().toISOString(),
+        createdAt:
+          res.data.createdAt || user.createdAt || new Date().toISOString(),
       };
 
       setUser(userData);
@@ -254,7 +256,9 @@ const ProfilePage = () => {
       } else {
         setMessage({
           type: "error",
-          text: err.message || `Failed to update ${section} information. Please try again.`,
+          text:
+            err.message ||
+            `Failed to update ${section} information. Please try again.`,
         });
       }
     } finally {
@@ -318,7 +322,8 @@ const ProfilePage = () => {
         country: res.data.country || user.country || "",
         city: res.data.city || user.city || "",
         profileImage: res.data.profileImage || null,
-        createdAt: res.data.createdAt || user.createdAt || new Date().toISOString(),
+        createdAt:
+          res.data.createdAt || user.createdAt || new Date().toISOString(),
       };
 
       setUser(updatedUser);
@@ -359,7 +364,9 @@ const ProfilePage = () => {
   };
 
   const handleDeleteImage = async () => {
-    if (!window.confirm("Are you sure you want to remove your profile image?")) {
+    if (
+      !window.confirm("Are you sure you want to remove your profile image?")
+    ) {
       return;
     }
 
@@ -380,7 +387,8 @@ const ProfilePage = () => {
         country: res.data.user.country || user.country || "",
         city: res.data.user.city || user.city || "",
         profileImage: null,
-        createdAt: res.data.user.createdAt || user.createdAt || new Date().toISOString(),
+        createdAt:
+          res.data.user.createdAt || user.createdAt || new Date().toISOString(),
       };
       setUser(updatedUser);
       setImageError(false);
@@ -433,23 +441,23 @@ const ProfilePage = () => {
   if (!user) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/20">
+    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/20 relative z-10">
       <Sidebar />
-      <div className="flex-1 p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex-1 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
           {message.text && (
             <div
-              className={`p-4 rounded-xl border ${
+              className={`p-3 sm:p-4 rounded-xl border ${
                 message.type === "success"
                   ? "bg-green-50 border-green-200 text-green-800"
                   : "bg-red-50 border-red-200 text-red-800"
-              } animate-fade-in`}
+              } animate-fade-in text-sm sm:text-base`}
             >
               <div className="flex items-center justify-between">
                 <span>{message.text}</span>
@@ -463,12 +471,14 @@ const ProfilePage = () => {
             </div>
           )}
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-blue-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-800 to-blue-600 bg-clip-text text-transparent">
               Account Settings
             </h1>
-            <p className="text-gray-500">Manage your profile and preferences</p>
+            <p className="text-gray-500 text-sm sm:text-base">
+              Manage your profile and preferences
+            </p>
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border p-4">
+          <div className="bg-white rounded-2xl shadow-sm border p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-gray-700">
                 Profile Completion: {completion}%
@@ -479,45 +489,48 @@ const ProfilePage = () => {
                 </span>
               )}
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 relative">
+            <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 relative">
               <div
-                className={`h-3 rounded-full transition-all duration-500 ${
+                className={`h-2 sm:h-3 rounded-full transition-all duration-500 ${
                   completion === 100 ? "bg-green-500" : "bg-blue-500"
                 }`}
                 style={{ width: `${completion}%` }}
               ></div>
             </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl shadow-sm border p-6 text-center sticky top-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="md:col-span-1">
+              <div className="bg-white rounded-2xl shadow-sm border p-4 sm:p-6 text-center sticky top-4">
                 <div className="relative mb-4 inline-block">
                   <div className="relative">
                     {user.profileImage && !imageError ? (
                       <img
                         src={user.profileImage}
                         alt="Profile"
-                        className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-md mx-auto"
+                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-4 border-white shadow-md mx-auto"
                         onError={handleProfileImageError}
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-2xl border-4 border-white shadow-md mx-auto bg-gray-100 flex items-center justify-center">
-                        <RiUser3Line size={40} className="text-gray-400" />
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-4 border-white shadow-md mx-auto bg-gray-100 flex items-center justify-center">
+                        <RiUser3Line
+                          size={32}
+                          className="text-gray-400 sm:size-40"
+                        />
                       </div>
                     )}
                     {imageUploading && (
                       <div className="absolute inset-0 bg-black bg-opacity-50 rounded-2xl flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                        <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-b-2 border-white"></div>
                       </div>
                     )}
                   </div>
                   <label
                     htmlFor="imageUpload"
-                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-colors"
+                    className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-colors"
                     title="Upload new photo"
                   >
                     <svg
-                      className="w-4 h-4 text-white"
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -539,12 +552,12 @@ const ProfilePage = () => {
                   {user.profileImage && !imageError && (
                     <button
                       onClick={handleDeleteImage}
-                      className="absolute -bottom-1 -left-1 w-8 h-8 bg-red-500 rounded-full border-2 border-white flex items-center justify-center cursor-pointer hover:bg-red-600 transition-colors"
+                      className="absolute -bottom-1 -left-1 w-7 h-7 sm:w-8 sm:h-8 bg-red-500 rounded-full border-2 border-white flex items-center justify-center cursor-pointer hover:bg-red-600 transition-colors"
                       title="Remove photo"
                       disabled={imageUploading}
                     >
                       <svg
-                        className="w-4 h-4 text-white"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -567,25 +580,27 @@ const ProfilePage = () => {
                     disabled={imageUploading}
                   />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900">
                   {user.firstName || user.lastName
                     ? `${user.firstName || ""} ${user.lastName || ""}`.trim()
                     : "User"}
                 </h3>
-                <p className="text-gray-600 mb-4">{user.role || "Not provided"}</p>
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-gray-600 text-sm sm:text-base mb-4">
+                  {user.role || "Not provided"}
+                </p>
+                <p className="text-xs sm:text-sm text-gray-500 mb-4">
                   Member since {new Date(user.createdAt).toLocaleDateString()}
                 </p>
                 <button
                   onClick={() => handleEdit("personal")}
                   disabled={isEditing}
-                  className="w-full bg-blue-500 text-white px-4 py-2.5 rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md"
+                  className="w-full bg-blue-500 text-white px-4 py-2 sm:py-2.5 rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md text-sm sm:text-base"
                 >
                   Edit Profile
                 </button>
               </div>
             </div>
-            <div className="lg:col-span-2 space-y-6">
+            <div className="md:col-span-2 space-y-4 sm:space-y-6">
               <SectionCard
                 title="Personal Information"
                 fields={["firstName", "lastName", "email", "phone"]}
@@ -652,19 +667,21 @@ const SectionCard = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
+    <div className="bg-white rounded-2xl shadow-sm border p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-800">
+          {title}
+        </h2>
         {isEditing ? (
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 mt-2 sm:mt-0">
             <button
               onClick={onSave}
               disabled={isLoading || !isFormValid()}
-              className="bg-green-500 cursor-pointer text-white px-4 py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="bg-green-500 cursor-pointer text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
             >
               {isLoading ? (
                 <span className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white mr-2"></div>
                   Saving...
                 </span>
               ) : (
@@ -674,7 +691,7 @@ const SectionCard = ({
             <button
               onClick={onCancel}
               disabled={isLoading}
-              className="bg-gray-300 cursor-pointer text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 disabled:opacity-50 transition-colors"
+              className="bg-gray-300 cursor-pointer text-gray-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-gray-400 disabled:opacity-50 transition-colors text-sm sm:text-base"
             >
               Cancel
             </button>
@@ -682,20 +699,20 @@ const SectionCard = ({
         ) : (
           <button
             onClick={onEdit}
-            className="text-blue-600 cursor-pointer hover:text-blue-800 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+            className="text-blue-600 cursor-pointer hover:text-blue-800 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-blue-50 transition-colors font-medium text-sm sm:text-base mt-2 sm:mt-0"
           >
             Edit
           </button>
         )}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         {fields.map((field) => (
           <div key={field} className="space-y-2">
-            <label className="text-gray-700 text-sm font-medium capitalize block">
+            <label className="text-gray-700 text-xs sm:text-sm font-medium capitalize block">
               {field.replace(/([A-Z])/g, " $1").trim()}
-              {["firstName", "lastName", "email", "country", "city"].includes(field) && (
-                <span className="text-red-500"> *</span>
-              )}
+              {["firstName", "lastName", "email", "country", "city"].includes(
+                field
+              ) && <span className="text-red-500"> *</span>}
             </label>
             {isEditing ? (
               <div>
@@ -703,7 +720,7 @@ const SectionCard = ({
                   type={field === "email" ? "email" : "text"}
                   value={editForm[field] || ""}
                   onChange={(e) => handleInputChange(field, e.target.value)}
-                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  className={`w-full p-2 sm:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm sm:text-base ${
                     errors[field] ? "border-red-300" : "border-gray-300"
                   }`}
                   placeholder={getPlaceholderText(field)}
@@ -713,7 +730,7 @@ const SectionCard = ({
                 )}
               </div>
             ) : (
-              <p className="text-gray-900 font-semibold p-3 bg-gray-50 rounded-lg">
+              <p className="text-gray-900 font-semibold p-2 sm:p-3 bg-gray-50 rounded-lg text-sm sm:text-base">
                 {user[field] || (
                   <span className="text-gray-400 italic">Not provided</span>
                 )}
@@ -722,15 +739,15 @@ const SectionCard = ({
           </div>
         ))}
         {role && (
-          <div className="md:col-span-2 space-y-2">
-            <label className="text-gray-700 text-sm font-medium block">
+          <div className="sm:col-span-2 space-y-2">
+            <label className="text-gray-700 text-xs sm:text-sm font-medium block">
               Role <span className="text-red-500">*</span>
             </label>
             {isEditing ? (
               <select
                 value={editForm.role || ""}
                 onChange={(e) => handleInputChange("role", e.target.value)}
-                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                className={`w-full p-2 sm:p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base ${
                   errors.role ? "border-red-300" : "border-gray-300"
                 }`}
               >
