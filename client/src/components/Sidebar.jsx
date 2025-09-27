@@ -200,23 +200,18 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Mobile Menu Button - Fixed with proper z-index */}
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         className="lg:hidden fixed top-4 left-4 z-30 p-3 bg-[#212E7C] rounded-xl text-white shadow-lg hover:bg-[#1a2563] transition-colors"
       >
         {isMobileMenuOpen ? <RiCloseLine size={20} /> : <RiMenuLine size={20} />}
       </button>
-
-      {/* Mobile Overlay - Only show when menu is open */}
       {isMobileMenuOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-20"
           onClick={closeMobileMenu}
         />
       )}
-
-      {/* Sidebar - Higher z-index than overlay but lower than menu button */}
       <div
         className={`
           fixed lg:sticky top-0 left-0 z-20
@@ -226,7 +221,6 @@ const Sidebar = () => {
           ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        {/* User Profile Section */}
         <div className="p-4 lg:p-6 border-b border-gray-700 flex-shrink-0">
           <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
             <div className="relative">
@@ -271,8 +265,6 @@ const Sidebar = () => {
             </div>
           </div>
         </div>
-
-        {/* Navigation Menu */}
         <div className="flex-1 overflow-y-auto p-3 lg:p-4">
           <nav className="space-y-2">
             {menuItems.map((item, index) => {
@@ -306,8 +298,6 @@ const Sidebar = () => {
             })}
           </nav>
         </div>
-
-        {/* Logout Button */}
         <div className="p-3 lg:p-4 border-t border-gray-700 flex-shrink-0">
           <button
             onClick={handleLogout}
