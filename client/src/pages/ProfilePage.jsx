@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types */
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import {
   getProfile,
@@ -20,6 +21,8 @@ const ProfilePage = () => {
   const [completion, setCompletion] = useState(0);
   const [errors, setErrors] = useState({});
   const [imageError, setImageError] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Calculate profile completion percentage
   const calcCompletion = useCallback((u) => {
@@ -93,7 +96,7 @@ const ProfilePage = () => {
   const fetchProfile = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      setMessage({ type: "error", text: "Please log in to view your profile" });
+      navigate("/login", { state: { from: location.pathname } });
       return;
     }
 
@@ -105,10 +108,11 @@ const ProfilePage = () => {
         lastName: res.data.lastName || "",
         phone: res.data.phone || "",
         email: res.data.email || "",
-        role: res.data.role || "",
+        role: res.data.role || "Job Seeker",
         country: res.data.country || "",
         city: res.data.city || "",
         profileImage: res.data.profileImage || null,
+        createdAt: res.data.createdAt || new Date().toISOString(),
       };
       setUser(userData);
       calcCompletion(userData);
@@ -119,12 +123,22 @@ const ProfilePage = () => {
         })
       );
     } catch (err) {
-      setMessage({
-        type: "error",
-        text: err.response?.data?.msg || "Failed to load profile",
+      console.error("Error fetching profile:", {
+        message: err.message,
+        stack: err.stack,
       });
+      if (err.message.includes("401")) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userData");
+        navigate("/login", { state: { from: location.pathname } });
+      } else {
+        setMessage({
+          type: "error",
+          text: err.message || "Failed to load profile",
+        });
+      }
     }
-  }, [calcCompletion]);
+  }, [calcCompletion, navigate, location.pathname]);
 
   useEffect(() => {
     fetchProfile();
@@ -155,7 +169,7 @@ const ProfilePage = () => {
       lastName: user?.lastName || "",
       email: user?.email || "",
       phone: user?.phone || "",
-      role: user?.role || "",
+      role: user?.role || "Job Seeker",
       country: user?.country || "",
       city: user?.city || "",
     });
@@ -167,7 +181,7 @@ const ProfilePage = () => {
     setIsEditing(null);
     setEditForm({});
     setErrors({});
-    debouncedValidate.cancel(); // Cancel pending validations
+    debouncedValidate.cancel();
   };
 
   const handleSaveEdit = async (section) => {
@@ -204,9 +218,10 @@ const ProfilePage = () => {
         lastName: res.data.lastName || editForm.lastName || user.lastName || "",
         phone: res.data.phone || editForm.phone || user.phone || "",
         email: res.data.email || editForm.email || user.email || "",
-        role: res.data.role || editForm.role || user.role || "",
+        role: res.data.role || editForm.role || user.role || "Job Seeker",
         country: res.data.country || editForm.country || user.country || "",
         city: res.data.city || editForm.city || user.city || "",
+        createdAt: res.data.createdAt || user.createdAt || new Date().toISOString(),
       };
 
       setUser(userData);
@@ -228,12 +243,20 @@ const ProfilePage = () => {
         })
       );
     } catch (err) {
-      setMessage({
-        type: "error",
-        text:
-          err.response?.data?.msg ||
-          `Failed to update ${section} information. Please try again.`,
+      console.error("Error updating profile:", {
+        message: err.message,
+        stack: err.stack,
       });
+      if (err.message.includes("401")) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userData");
+        navigate("/login", { state: { from: location.pathname } });
+      } else {
+        setMessage({
+          type: "error",
+          text: err.message || `Failed to update ${section} information. Please try again.`,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -241,7 +264,10 @@ const ProfilePage = () => {
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file) {
+      setMessage({ type: "error", text: "No file selected" });
+      return;
+    }
 
     const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     const maxSize = 5 * 1024 * 1024; // 5MB
@@ -265,17 +291,36 @@ const ProfilePage = () => {
 
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No token found");
+      }
+
+      console.log("Selected file:", {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      });
+
       const formData = new FormData();
       formData.append("profileImage", file);
 
       const res = await uploadProfileImage(token, formData);
+      console.log("Upload response:", res.data);
+
       const updatedUser = {
         ...user,
         ...res.data,
         firstName: res.data.firstName || user.firstName || "",
         lastName: res.data.lastName || user.lastName || "",
         phone: res.data.phone || user.phone || "",
+        email: res.data.email || user.email || "",
+        role: res.data.role || user.role || "Job Seeker",
+        country: res.data.country || user.country || "",
+        city: res.data.city || user.city || "",
+        profileImage: res.data.profileImage || null,
+        createdAt: res.data.createdAt || user.createdAt || new Date().toISOString(),
       };
+
       setUser(updatedUser);
       setImageError(false);
       calcCompletion(updatedUser);
@@ -291,11 +336,22 @@ const ProfilePage = () => {
         })
       );
     } catch (err) {
-      setMessage({
-        type: "error",
-        text: err.response?.data?.msg || "Image upload failed",
+      console.error("Error uploading image:", {
+        message: err.message,
+        stack: err.stack,
+        response: err.response?.data,
       });
-      window.dispatchEvent(new CustomEvent("profileImageUploadError"));
+      if (err.message.includes("401")) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userData");
+        navigate("/login", { state: { from: location.pathname } });
+      } else {
+        setMessage({
+          type: "error",
+          text: err.message || "Image upload failed. Please try again.",
+        });
+        window.dispatchEvent(new CustomEvent("profileImageUploadError"));
+      }
     } finally {
       setImageUploading(false);
       e.target.value = "";
@@ -319,7 +375,12 @@ const ProfilePage = () => {
         firstName: res.data.user.firstName || user.firstName || "",
         lastName: res.data.user.lastName || user.lastName || "",
         phone: res.data.user.phone || user.phone || "",
+        email: res.data.user.email || user.email || "",
+        role: res.data.user.role || user.role || "Job Seeker",
+        country: res.data.user.country || user.country || "",
+        city: res.data.user.city || user.city || "",
         profileImage: null,
+        createdAt: res.data.user.createdAt || user.createdAt || new Date().toISOString(),
       };
       setUser(updatedUser);
       setImageError(false);
@@ -336,11 +397,21 @@ const ProfilePage = () => {
         })
       );
     } catch (err) {
-      setMessage({
-        type: "error",
-        text: err.response?.data?.msg || "Failed to remove profile image",
+      console.error("Error deleting image:", {
+        message: err.message,
+        stack: err.stack,
       });
-      window.dispatchEvent(new CustomEvent("profileImageUploadError"));
+      if (err.message.includes("401")) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userData");
+        navigate("/login", { state: { from: location.pathname } });
+      } else {
+        setMessage({
+          type: "error",
+          text: err.message || "Failed to remove profile image",
+        });
+        window.dispatchEvent(new CustomEvent("profileImageUploadError"));
+      }
     } finally {
       setImageUploading(false);
     }

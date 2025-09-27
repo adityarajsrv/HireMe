@@ -1,11 +1,8 @@
+/* eslint-disable no-unused-vars */
 import { useState } from "react";
-import {
-  LockClosedIcon,
-  EyeIcon,
-  EyeSlashIcon,
-} from "@heroicons/react/24/outline";
+import { LockClosedIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import loginUI from "../assets/login.png";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -14,14 +11,15 @@ const LoginPage = () => {
     lastName: "",
     email: "",
     password: "",
-    role: "Job Seeker", // Default role
+    role: "Job Seeker",
   });
-
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from || "/profile";
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -33,9 +31,10 @@ const LoginPage = () => {
     setError("");
     setSuccess("");
 
+    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
     const endpoint = isLogin
-      ? "http://localhost:5000/api/auth/login"
-      : "http://localhost:5000/api/auth/register";
+      ? `${baseUrl}/api/auth/login`
+      : `${baseUrl}/api/auth/register`;
 
     try {
       const res = await fetch(endpoint, {
@@ -43,30 +42,95 @@ const LoginPage = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-      const data = await res.json();
+
+      const text = await res.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (err) {
+        throw new Error("Invalid server response: Not valid JSON");
+      }
 
       if (!res.ok) {
-        throw new Error(data.msg || "Something went wrong");
+        throw new Error(data.msg || `HTTP error! Status: ${res.status}`);
       }
 
       if (isLogin) {
+        if (!data.token || !data.user) {
+          throw new Error("Invalid response: Missing token or user data");
+        }
+        const normalizedUser = {
+          ...data.user,
+          firstName: data.user.firstName || "",
+          lastName: data.user.lastName || "",
+          email: data.user.email || "",
+          role: data.user.role || "Job Seeker",
+          phone: data.user.phone || "",
+          country: data.user.country || "",
+          city: data.user.city || "",
+          profileImage: data.user.profileImage || null,
+          createdAt: data.user.createdAt || new Date().toISOString(),
+        };
         localStorage.setItem("token", data.token);
-        localStorage.setItem("userData", JSON.stringify(data.user));
+        localStorage.setItem("userData", JSON.stringify(normalizedUser));
         setSuccess("Login successful! Redirecting...");
-        setTimeout(() => navigate("/profile"), 1200);
+        setTimeout(() => navigate(from, { replace: true }), 1200);
       } else {
-        setSuccess("Registration successful! You can now log in.");
-        setIsLogin(true);
-        // Reset form after successful registration
+        // After registration, automatically log in
+        setSuccess("Registration successful! Logging in...");
+        const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            role: formData.role,
+          }),
+        });
+
+        const loginText = await loginRes.text();
+        let loginData;
+        try {
+          loginData = loginText ? JSON.parse(loginText) : {};
+        } catch (err) {
+          throw new Error("Invalid login response: Not valid JSON");
+        }
+
+        if (!loginRes.ok) {
+          throw new Error(loginData.msg || `Login failed! Status: ${loginRes.status}`);
+        }
+
+        if (!loginData.token || !loginData.user) {
+          throw new Error("Invalid login response: Missing token or user data");
+        }
+
+        const normalizedUser = {
+          ...loginData.user,
+          firstName: loginData.user.firstName || formData.firstName || "",
+          lastName: loginData.user.lastName || formData.lastName || "",
+          email: loginData.user.email || formData.email || "",
+          role: loginData.user.role || formData.role || "Job Seeker",
+          phone: loginData.user.phone || "",
+          country: loginData.user.country || "",
+          city: loginData.user.city || "",
+          profileImage: loginData.user.profileImage || null,
+          createdAt: loginData.user.createdAt || new Date().toISOString(),
+        };
+        localStorage.setItem("token", loginData.token);
+        localStorage.setItem("userData", JSON.stringify(normalizedUser));
+        setSuccess("Registration and login successful! Redirecting...");
+        setTimeout(() => navigate("/profile", { replace: true }), 1200);
         setFormData({
-          name: "",
+          firstName: "",
+          lastName: "",
           email: "",
           password: "",
           role: "Job Seeker",
         });
       }
     } catch (err) {
-      setError(err.message);
+      console.error("Login/Register error:", err);
+      setError(err.message || "Failed to connect to the server");
     } finally {
       setLoading(false);
     }
@@ -87,11 +151,7 @@ const LoginPage = () => {
             <div className="lg:w-3/5 h-full relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-indigo-900/20"></div>
               <div className="absolute inset-0 bg-gradient-to-tr from-blue-600/5 to-transparent"></div>
-              <img
-                className="w-full h-full object-cover"
-                src={loginUI}
-                alt="Login UI"
-              />
+              <img className="w-full h-full object-cover" src={loginUI} alt="Login UI" />
               <div className="absolute inset-0 bg-black/10"></div>
             </div>
             <div className="lg:w-2/5 h-full flex items-center justify-center p-8 sm:p-12">
@@ -106,9 +166,7 @@ const LoginPage = () => {
                     {isLogin ? "Welcome Back" : "Create Account"}
                   </h2>
                   <p className="mt-3 text-gray-300 text-sm">
-                    {isLogin
-                      ? "Sign in to unlock your potential"
-                      : "Start your journey with us"}
+                    {isLogin ? "Sign in to unlock your potential" : "Start your journey with us"}
                     <span
                       onClick={() => {
                         setIsLogin(!isLogin);
@@ -126,10 +184,7 @@ const LoginPage = () => {
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label
-                            htmlFor="firstName"
-                            className="block text-sm font-medium text-gray-200 mb-2"
-                          >
+                          <label htmlFor="firstName" className="block text-sm font-medium text-gray-200 mb-2">
                             First Name
                           </label>
                           <input
@@ -144,10 +199,7 @@ const LoginPage = () => {
                           />
                         </div>
                         <div>
-                          <label
-                            htmlFor="lastName"
-                            className="block text-sm font-medium text-gray-200 mb-2"
-                          >
+                          <label htmlFor="lastName" className="block text-sm font-medium text-gray-200 mb-2">
                             Last Name
                           </label>
                           <input
@@ -162,12 +214,8 @@ const LoginPage = () => {
                           />
                         </div>
                       </div>
-
                       <div>
-                        <label
-                          htmlFor="role"
-                          className="block text-sm font-medium text-gray-200 mb-2"
-                        >
+                        <label htmlFor="role" className="block text-sm font-medium text-gray-200 mb-2">
                           I am a
                         </label>
                         <select
@@ -179,11 +227,7 @@ const LoginPage = () => {
                           required
                         >
                           {roleOptions.map((role) => (
-                            <option
-                              key={role}
-                              value={role}
-                              className="bg-gray-900 text-white"
-                            >
+                            <option key={role} value={role} className="bg-gray-900 text-white">
                               {role}
                             </option>
                           ))}
@@ -195,22 +239,14 @@ const LoginPage = () => {
                             stroke="currentColor"
                             viewBox="0 0 24 24"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 9l-7 7-7-7"
-                            />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
                         </div>
                       </div>
                     </>
                   )}
                   <div>
-                    <label
-                      htmlFor="email"
-                      className="block text-sm font-medium text-gray-200 mb-2"
-                    >
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-200 mb-2">
                       Email Address
                     </label>
                     <div className="relative">
@@ -226,12 +262,8 @@ const LoginPage = () => {
                       />
                     </div>
                   </div>
-
                   <div>
-                    <label
-                      htmlFor="password"
-                      className="block text-sm font-medium text-gray-200 mb-2"
-                    >
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-2">
                       Password
                     </label>
                     <div className="relative">
@@ -251,11 +283,7 @@ const LoginPage = () => {
                         onClick={() => setShowPassword(!showPassword)}
                         className="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-200 transition-colors"
                       >
-                        {showPassword ? (
-                          <EyeSlashIcon className="h-5 w-5" />
-                        ) : (
-                          <EyeIcon className="h-5 w-5" />
-                        )}
+                        {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                       </button>
                     </div>
                     {!isLogin && (
@@ -264,33 +292,25 @@ const LoginPage = () => {
                       </p>
                     )}
                   </div>
-
                   <button
                     type="submit"
                     disabled={loading}
                     className="cursor-pointer w-full flex items-center justify-center py-3.5 px-6 bg-gradient-to-r from-blue-700 to-blue-800 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-blue-500/20"
                   >
                     <LockClosedIcon className="h-5 w-5 mr-2" />
-                    {loading
-                      ? "Processing..."
-                      : isLogin
-                      ? "Sign In"
-                      : "Sign Up"}
+                    {loading ? "Processing..." : isLogin ? "Sign In" : "Sign Up"}
                   </button>
-
                   {error && (
                     <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                       {error}
                     </div>
                   )}
-
                   {success && (
                     <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
                       {success}
                     </div>
                   )}
                 </form>
-
                 <div className="mt-8 text-center text-xs text-gray-400">
                   <p>
                     By signing up, you agree to our{" "}

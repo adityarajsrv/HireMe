@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect } from "react";
 import {
   RiFileTextLine,
@@ -21,13 +22,12 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Fetch user data from localStorage or API
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const token = localStorage.getItem("token");
         if (!token) {
-          navigate("/login");
+          navigate("/login", { state: { from: location.pathname } });
           return;
         }
 
@@ -39,40 +39,54 @@ const Sidebar = () => {
             firstName: userData.firstName || "",
             lastName: userData.lastName || "",
             role: userData.role || "Job Seeker",
+            email: userData.email || "",
+            phone: userData.phone || "",
+            country: userData.country || "",
+            city: userData.city || "",
             profileImage: userData.profileImage || null,
+            createdAt: userData.createdAt || new Date().toISOString(),
           });
           setImageError(false);
         } else {
           setImageLoading(true);
-          const response = await fetch(
-            "http://localhost:5000/api/auth/profile",
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-          if (response.ok) {
-            const userData = await response.json();
-            const normalizedUser = {
-              ...userData,
-              firstName: userData.firstName || "",
-              lastName: userData.lastName || "",
-              role: userData.role || "Job Seeker",
-              profileImage: userData.profileImage || null,
-            };
-            setUser(normalizedUser);
-            setImageError(false);
-            localStorage.setItem("userData", JSON.stringify(normalizedUser));
-          } else if (response.status === 401) {
-            localStorage.removeItem("token");
-            localStorage.removeItem("userData");
-            navigate("/login");
+          const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+          const response = await fetch(`${baseUrl}/api/auth/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const text = await response.text();
+          let userData;
+          try {
+            userData = text ? JSON.parse(text) : {};
+          } catch (err) {
+            throw new Error("Invalid server response: Not valid JSON");
           }
+
+          if (!response.ok) {
+            throw new Error(userData.msg || `HTTP error! Status: ${response.status}`);
+          }
+
+          const normalizedUser = {
+            ...userData,
+            firstName: userData.firstName || "",
+            lastName: userData.lastName || "",
+            role: userData.role || "Job Seeker",
+            email: userData.email || "",
+            phone: userData.phone || "",
+            country: userData.country || "",
+            city: userData.city || "",
+            profileImage: userData.profileImage || null,
+            createdAt: userData.createdAt || new Date().toISOString(),
+          };
+          setUser(normalizedUser);
+          setImageError(false);
+          localStorage.setItem("userData", JSON.stringify(normalizedUser));
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
-        setImageError(true);
+        localStorage.removeItem("token");
+        localStorage.removeItem("userData");
+        navigate("/login", { state: { from: location.pathname } });
       } finally {
         setImageLoading(false);
       }
@@ -87,7 +101,12 @@ const Sidebar = () => {
           firstName: event.detail.user.firstName || "",
           lastName: event.detail.user.lastName || "",
           role: event.detail.user.role || "Job Seeker",
+          email: event.detail.user.email || "",
+          phone: event.detail.user.phone || "",
+          country: event.detail.user.country || "",
+          city: event.detail.user.city || "",
           profileImage: event.detail.user.profileImage || null,
+          createdAt: event.detail.user.createdAt || new Date().toISOString(),
         };
         setUser(normalizedUser);
         setImageError(false);
@@ -108,7 +127,12 @@ const Sidebar = () => {
           firstName: event.detail.user.firstName || "",
           lastName: event.detail.user.lastName || "",
           role: event.detail.user.role || "Job Seeker",
+          email: event.detail.user.email || "",
+          phone: event.detail.user.phone || "",
+          country: event.detail.user.country || "",
+          city: event.detail.user.city || "",
           profileImage: event.detail.user.profileImage || null,
+          createdAt: event.detail.user.createdAt || new Date().toISOString(),
         };
         setUser(normalizedUser);
         setImageError(false);
@@ -133,7 +157,7 @@ const Sidebar = () => {
       window.removeEventListener("profileImageUploadComplete", handleImageUploadComplete);
       window.removeEventListener("profileImageUploadError", handleImageUploadError);
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   const menuItems = [
     { icon: RiHome5Line, label: "Home", path: "/" },
@@ -156,7 +180,7 @@ const Sidebar = () => {
     if (window.confirm("Are you sure you want to logout?")) {
       localStorage.removeItem("token");
       localStorage.removeItem("userData");
-      navigate("/login");
+      navigate("/login", { state: { from: location.pathname } });
     }
   };
 
@@ -176,11 +200,7 @@ const Sidebar = () => {
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         className="cursor-pointer lg:hidden fixed top-4 left-4 z-50 p-2 bg-gray-900 rounded-lg text-white"
       >
-        {isMobileMenuOpen ? (
-          <RiCloseLine size={24} />
-        ) : (
-          <RiMenuLine size={24} />
-        )}
+        {isMobileMenuOpen ? <RiCloseLine size={24} /> : <RiMenuLine size={24} />}
       </button>
       {isMobileMenuOpen && (
         <div
@@ -193,11 +213,7 @@ const Sidebar = () => {
           fixed lg:static inset-y-0 left-0 z-40
           w-64 bg-gradient-to-b from-gray-900 to-gray-800 shadow-xl
           transform transition-transform duration-300 ease-in-out
-          ${
-            isMobileMenuOpen
-              ? "translate-x-0"
-              : "-translate-x-full lg:translate-x-0"
-          }
+          ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
         <div className="p-6 border-b border-gray-700">
