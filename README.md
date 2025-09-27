@@ -143,14 +143,16 @@ The application features a fully responsive design that works seamlessly across 
 
 ---
 
-## Screenshots 
-![Landing Page](client/src/assets/LandingPage1.png]
-![Landing Page](client/src/assets/LandingPage2.png]
-![Landing Page](client/src/assets/LandingPage3.png]
-![Landing Page](client/src/assets/LandingPage4.png]
-![SignUp Page](client/src/assets/SignUpPage.png]
-![Login Page](client/src/assets/LoginPage.png]
-![Profile Page](client/src/assets/ProfilePage.png]
+## 📸 Screenshots
+
+![Landing Page 1](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/LandingPage1.png)
+![Landing Page 2](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/LandingPage2.png)
+![Landing Page 3](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/LandingPage3.png)
+![Landing Page 4](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/LandingPage4.png)
+![Sign Up Page](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/SignUpPage.png)
+![Login Page](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/LoginPage.png)
+![Profile Page](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/ProfilePage.png)
+
 
 ## ⭐ Support the Project
 
