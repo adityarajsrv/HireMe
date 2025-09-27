@@ -16,7 +16,7 @@ const upload = multer({
       cb(new Error('Only image files are allowed!'), false);
     }
   }
-}).single('profileImage'); // Ensure field name matches frontend
+}).single('profileImage'); 
 
 router.post('/register', async (req, res) => {
   try {
@@ -151,7 +151,6 @@ router.put('/profile', async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Only update fields that are provided
     const updateFields = {};
     ['firstName', 'lastName', 'email', 'phone', 'role', 'country', 'city'].forEach(field => {
       if (req.body[field] !== undefined) updateFields[field] = req.body[field];
