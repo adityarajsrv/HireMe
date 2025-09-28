@@ -55,7 +55,7 @@ export const uploadProfileImage = async (token, formData) => {
     console.log("FormData contains file:", formData.has("profileImage"));
 
     const response = await fetch(`${baseUrl}/api/auth/profile/image`, {
-      method: "PUT", // Changed to PUT to match backend
+      method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
       },
