@@ -1,10 +1,19 @@
 # HireMe - Recruitment Platform Prototype
 
-A modern, full-stack recruitment platform built with React and Node.js that provides user authentication and profile management.
+A modern, full-stack recruitment platform built with the MERN stack that provides user authentication and profile management.
 
-![HireMe Platform](https://img.shields.io/badge/Platform-Recruitment-blue) ![React](https://img.shields.io/badge/React-18.2.0-61DAFB) ![Node.js](https://img.shields.io/badge/Node.js-Express-green) ![MongoDB](https://img.shields.io/badge/Database-MongoDB-green) ![JWT](https://img.shields.io/badge/Auth-JWT-orange)
+<div align="center">
 
-## 🌟 Features
+![HireMe Platform](https://img.shields.io/badge/Platform-Recruitment-blue) 
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?logo=mongodb&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-000000?logo=express&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
+![Node.js](https://img.shields.io/badge/Node.js-339933?logo=nodedotjs&logoColor=white)
+![JWT](https://img.shields.io/badge/Auth-JWT-orange?logo=jsonwebtokens)
+
+</div>
+
+## 🚀 Features
 
 ### 🔐 Authentication & Security
 - **JWT-based authentication** with secure token management
@@ -23,7 +32,7 @@ A modern, full-stack recruitment platform built with React and Node.js that prov
 - **Interactive sidebar** with smooth animations
 - **Touch-friendly interface** optimized for mobile devices
 
-## 🚀 Quick Start
+## 🛠 Quick Start
 
 ### Prerequisites
 - Node.js (v14 or higher)
@@ -34,7 +43,7 @@ A modern, full-stack recruitment platform built with React and Node.js that prov
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/HireMe.git
+git clone https://github.com/adityarajsrv/HireMe.git
 cd HireMe
 ```
 
@@ -113,7 +122,7 @@ HireMe/
 - Real-time profile completion tracking
 - Editable personal and address information
 
-## 🔧 API Endpoints
+## 🔌 API Endpoints
 
 ### Authentication
 - `POST /api/auth/register` - User registration
@@ -152,7 +161,6 @@ The application features a fully responsive design that works seamlessly across 
 ![Sign Up Page](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/SignUpPage.png)
 ![Login Page](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/LoginPage.png)
 ![Profile Page](https://raw.githubusercontent.com/adityarajsrv/HireMe/main/client/src/assets/ProfilePage.png)
-
 
 ## ⭐ Support the Project
 
